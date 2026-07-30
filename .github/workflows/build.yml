@@ -41,31 +41,30 @@ jobs:
       - name: Configure
         run: |
           cd openwrt
-          cat >> .config <<'EOF'
-CONFIG_TARGET_x86=y
-CONFIG_TARGET_x86_64=y
-CONFIG_TARGET_x86_64_Generic=y
-CONFIG_PACKAGE_luci=y
-CONFIG_PACKAGE_luci-ssl=y
-CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
-CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
-CONFIG_PACKAGE_luci-i18n-mihomo-zh-cn=y
-CONFIG_PACKAGE_luci-i18n-sing-box-zh-cn=y
-CONFIG_PACKAGE_luci-app-openclash=y
-CONFIG_PACKAGE_luci-app-mihomo=y
-CONFIG_PACKAGE_luci-app-sing-box=y
-CONFIG_PACKAGE_sing-box=y
-CONFIG_PACKAGE_luci-app-oaf=y
-CONFIG_PACKAGE_luci-app-eqos=y
-CONFIG_PACKAGE_luci-app-accesscontrol=y
-CONFIG_PACKAGE_curl=y
-CONFIG_PACKAGE_htop=y
-CONFIG_PACKAGE_kmod-usb3=y
-CONFIG_IPV6=y
-CONFIG_CCACHE=y
-CONFIG_VERSION_DIST="OpenWrt2026"
-EOF
-          # 设置默认 LAN IP 为 192.168.1.230
+          {
+            echo CONFIG_TARGET_x86=y
+            echo CONFIG_TARGET_x86_64=y
+            echo CONFIG_TARGET_x86_64_Generic=y
+            echo CONFIG_PACKAGE_luci=y
+            echo CONFIG_PACKAGE_luci-ssl=y
+            echo CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
+            echo CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
+            echo CONFIG_PACKAGE_luci-i18n-mihomo-zh-cn=y
+            echo CONFIG_PACKAGE_luci-i18n-sing-box-zh-cn=y
+            echo CONFIG_PACKAGE_luci-app-openclash=y
+            echo CONFIG_PACKAGE_luci-app-mihomo=y
+            echo CONFIG_PACKAGE_luci-app-sing-box=y
+            echo CONFIG_PACKAGE_sing-box=y
+            echo CONFIG_PACKAGE_luci-app-oaf=y
+            echo CONFIG_PACKAGE_luci-app-eqos=y
+            echo CONFIG_PACKAGE_luci-app-accesscontrol=y
+            echo CONFIG_PACKAGE_curl=y
+            echo CONFIG_PACKAGE_htop=y
+            echo CONFIG_PACKAGE_kmod-usb3=y
+            echo CONFIG_IPV6=y
+            echo CONFIG_CCACHE=y
+            echo 'CONFIG_VERSION_DIST="OpenWrt2026"'
+          } >> .config
           sed -i 's|192.168.1.1|10.0.0.2|g' package/base-files/files/bin/config_generate
           make defconfig
 
