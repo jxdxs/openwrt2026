@@ -1,15 +1,9 @@
-name: Build OpenWrt with OpenClash + Mihomo
+name: Build OpenWrt with OpenClash + Mihomo + Sing-box + OAF
 
 on:
   push:
     branches: [ master ]
-    tags:
-      - 'v*'
   workflow_dispatch:
-
-env:
-  OPENWRT_REPO: https://git.openwrt.org/openwrt/openwrt.git
-  OPENWRT_BRANCH: main
 
 jobs:
   build:
@@ -21,90 +15,65 @@ jobs:
         run: |
           sudo swapoff -a 2>/dev/null || true
           sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet
-          docker system prune -af 2>/dev/null || true
-          df -h /
 
-      - name: Install dependencies
+      - name: Install deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            build-essential ccache curl ecj fastjar file g++ gawk \
-            gettext git git-core libelf-dev libncurses5-dev \
-            libssl-dev python3 python3-dev python3-pip \
-            rsync subversion swig time unzip wget xsltproc zlib1g-dev \
-            qemu-utils
+          sudo apt-get install -y -qq build-essential ccache curl file g++ gawk gettext git libelf-dev libncurses5-dev libssl-dev python3 python3-pip rsync subversion swig time unzip wget xsltproc zlib1g-dev
 
-      - name: Clone OpenWrt source
-        run: |
-          git clone --depth=1 $OPENWRT_REPO openwrt
-          cd openwrt
-          echo "Source: $(git log --oneline -1)"
+      - name: Clone OpenWrt
+        run: git clone --depth=1 https://git.openwrt.org/openwrt/openwrt.git openwrt
 
-      - name: Configure feeds with OpenClash + Mihomo
+      - name: Add feeds
         run: |
           cd openwrt
-          cat >> feeds.conf << 'FEEDS'
-src-git openclash https://github.com/vernesong/OpenClash.git
-src-git mihomo https://github.com/nikkinikki-org/OpenWrt-mihomo.git
-FEEDS
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          echo "src-git openclash https://github.com/vernesong/OpenClash.git" >> feeds.conf
+          echo "src-git mihomo https://github.com/nikkinikki-org/OpenWrt-mihomo.git" >> feeds.conf
+          echo "src-git singbox https://github.com/yichya/luci-app-sing-box.git" >> feeds.conf
+          echo "src-git OAF https://github.com/destan19/OpenAppFilter.git" >> feeds.conf
 
-      - name: Configure target (x86-64)
+      - name: Update feeds
+        run: cd openwrt && ./scripts/feeds update -a
+
+      - name: Install feeds
+        run: cd openwrt && ./scripts/feeds install -a
+
+      - name: Configure
         run: |
           cd openwrt
-          cat > .config << 'CONFIG'
+          cat >> .config <<'EOF'
 CONFIG_TARGET_x86=y
 CONFIG_TARGET_x86_64=y
 CONFIG_TARGET_x86_64_Generic=y
-
 CONFIG_PACKAGE_luci=y
 CONFIG_PACKAGE_luci-ssl=y
 CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
-
+CONFIG_PACKAGE_luci-i18n-openclash-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-mihomo-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-sing-box-zh-cn=y
 CONFIG_PACKAGE_luci-app-openclash=y
 CONFIG_PACKAGE_luci-app-mihomo=y
-
+CONFIG_PACKAGE_luci-app-sing-box=y
+CONFIG_PACKAGE_sing-box=y
+CONFIG_PACKAGE_luci-app-oaf=y
+CONFIG_PACKAGE_luci-app-eqos=y
+CONFIG_PACKAGE_luci-app-accesscontrol=y
 CONFIG_PACKAGE_curl=y
-CONFIG_PACKAGE_wget=y
-CONFIG_PACKAGE_tcpdump=y
-CONFIG_PACKAGE_iperf3=y
-CONFIG_PACKAGE_nano=y
 CONFIG_PACKAGE_htop=y
-
-CONFIG_PACKAGE_kmod-fs-ext4=y
-CONFIG_PACKAGE_kmod-fs-vfat=y
-CONFIG_PACKAGE_kmod-usb-storage=y
 CONFIG_PACKAGE_kmod-usb3=y
-
 CONFIG_IPV6=y
-CONFIG_PACKAGE_ip6tables=y
-CONFIG_PACKAGE_odhcp6c=y
-
 CONFIG_CCACHE=y
-CONFIG_BUILD_LOG=y
-CONFIG_DEVEL=y
 CONFIG_VERSION_DIST="OpenWrt2026"
-CONFIG_VERSION_NUMBER="snapshot"
-CONFIG_VERSION_CODE="r$(date +%Y%m%d)"
-CONFIG
+EOF
+          # 设置默认 LAN IP 为 192.168.1.230
+          sed -i 's|192.168.1.1|10.0.0.2|g' package/base-files/files/bin/config_generate
           make defconfig
 
-      - name: Download source
-        run: |
-          cd openwrt
-          make download -j$(nproc) V=s 2>&1 | tail -20
+      - name: Download sources
+        run: cd openwrt && set -o pipefail; make download -j$(nproc) V=s 2>&1 | tail -20
 
-      - name: Build firmware
-        run: |
-          cd openwrt
-          make -j$(nproc) V=s 2>&1 | tail -80
-
-      - name: List artifacts
-        run: |
-          cd openwrt
-          find bin/targets -type f | head -30
-          find bin/packages -type f -name "*.ipk" | head -20
+      - name: Build
+        run: cd openwrt && set -o pipefail; make -j$(nproc) V=s 2>&1 | tail -200
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
@@ -112,18 +81,3 @@ CONFIG
           name: openwrt-x86-64
           path: openwrt/bin/targets/x86/*
           retention-days: 7
-
-      - name: Upload packages (IPK)
-        uses: actions/upload-artifact@v4
-        with:
-          name: openwrt-packages
-          path: openwrt/bin/packages/**/*.ipk
-          retention-days: 7
-
-      - name: Upload logs (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: openwrt/logs/
-          retention-days: 3
