@@ -124,6 +124,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Summarize build failure
+        if: ${{ failure() }}
+        run: |
+          cd openwrt
+          {
+            echo '## Build failure excerpts'
+            echo
+            echo 'The following are the first matching compiler/build diagnostics:'
+            echo '```text'
+            grep -inE '(^|[[:space:]])(error|fatal error|undefined reference|no rule to make target|cannot find|no space left|out of memory|modpost:)' build.log | head -40 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          first_error="$(grep -inE '(^|[[:space:]])(error|fatal error|undefined reference|no rule to make target|cannot find|no space left|out of memory|modpost:)' build.log | head -1 || true)"
+          if [ -n "$first_error" ]; then
+            echo "::error title=First build diagnostic::$first_error"
+          else
+            echo '::error title=Build failed::No standard error marker found; inspect openwrt-build-log artifact.'
+          fi
+
       - name: Upload firmware
         if: ${{ success() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
