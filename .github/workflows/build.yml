@@ -51,6 +51,26 @@ jobs:
       - name: Install feeds
         run: cd openwrt && ./scripts/feeds install -a
 
+      - name: Patch OAF kernel dependencies
+        run: |
+          cd openwrt
+          # OAF calls nf_send_reset(), which is exported by the IPv4
+          # nf-reject kernel module on Linux 6.6/OpenWrt 24.10.  The
+          # upstream OAF feed only declares kmod-ipt-conntrack, so modpost
+          # otherwise fails with an undefined symbol late in the build.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          makefile = Path("feeds/OAF/oaf/Makefile")
+          text = makefile.read_text()
+          old = "  DEPENDS:=+kmod-ipt-conntrack"
+          new = "  DEPENDS:=+kmod-ipt-conntrack +kmod-nf-reject"
+          if old not in text:
+              raise SystemExit(f"expected OAF dependency line not found in {makefile}")
+          makefile.write_text(text.replace(old, new, 1))
+          PY
+          grep -F 'DEPENDS:=+kmod-ipt-conntrack +kmod-nf-reject' feeds/OAF/oaf/Makefile
+
       - name: Configure
         run: |
           cd openwrt
